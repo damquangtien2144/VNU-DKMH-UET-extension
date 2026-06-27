@@ -45,7 +45,9 @@
         "popup/popup.js",
         "assets/qr/*",
         "assets/gif/*",
-        "logo/*"
+        "logo/*",
+        "libs/*",
+        "i18n/*"
       ],
       "matches": ["<all_urls>"]
     }
