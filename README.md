@@ -50,6 +50,9 @@ Mỗi mùa ĐKMH, sinh viên VNU thường phải dùng **Ctrl+F** để tìm t�
 - Dùng dấu phẩy `,` để tìm nhiều giá trị cùng lúc (VD: `Thứ 2, Thứ 4`)
 - Nhấn **🔍** hoặc **Enter** để tô sáng môn trên trang web
 - Chọn **màu highlight** riêng cho mỗi môn
+- **Deep Search (Tìm kiếm sâu)**: Hỗ trợ quét xuyên qua Shadow DOM, Iframes và các phần tử bị ẩn trên trang ĐKMH.
+- **Badge 🔍 Ẩn**: Hiển thị nhãn nhận diện nếu môn học nằm trong phần tử đang bị ẩn.
+- **Xử lý tiếng Việt chuẩn xác**: Giữ đúng vị trí highlight cho các tên môn học có dấu tiếng Việt phức tạp.
 
 ### ⚡ Quét tất cả (Scan All)
 - Highlight **toàn bộ** danh sách lên trang web chỉ với 1 click
@@ -106,6 +109,14 @@ Mỗi mùa ĐKMH, sinh viên VNU thường phải dùng **Ctrl+F** để tìm t�
 - **Kiểu highlight**: tô nền · gạch chân lượn sóng · gạch dưới đậm · in đậm + đổi màu
 - **Điều chỉnh độ đậm** (opacity) của highlight
 - **Xem trước** kiểu highlight trước khi lưu
+
+### 🛡️ Bảo mật & Hiệu suất (Mới cập nhật)
+- **Chống tấn công XSS & CSV Injection**: Xử lý và làm sạch dữ liệu đầu vào, đảm bảo an toàn tuyệt đối khi import/export dữ liệu.
+- **Tối ưu bộ nhớ & ID**: Sử dụng `crypto.randomUUID()` để chống trùng lặp ID và tự động giải phóng bộ nhớ.
+- **Bảo mật kết nối**: Xác thực nguồn gốc `postMessage` chặt chẽ giữa các thành phần.
+- **Quyền riêng tư 100%**: Loại bỏ hoàn toàn Google Fonts, sử dụng System Fonts để tăng tốc độ và bảo mật.
+- **Chống ReDoS**: Tối ưu biểu thức Regex giúp trình duyệt không bị đơ khi tìm kiếm.
+- **Tương thích hoàn hảo**: Sửa lỗi hiển thị bộ chọn màu trên Firefox (`::-moz-color-swatch`).
 
 ### 🌐 Song ngữ (Tiếng Việt / English)
 - Chuyển đổi ngôn ngữ bằng nút **🌐** trên header
@@ -227,7 +238,7 @@ vnu-dk-mon-hoc-extension/
 |------------|-----------|
 | Platform | Chrome Extension Manifest V3 |
 | Frontend | HTML5, Vanilla CSS, Vanilla JS |
-| Font | [Inter](https://fonts.google.com/specimen/Inter) (Google Fonts) |
+| Font | Hệ thống (System Fonts) - Tối ưu quyền riêng tư |
 | QR Code | [qrcode.js](https://github.com/davidshimjs/qrcodejs) |
 | Storage | `chrome.storage.local` |
 | i18n | Custom JSON-based (vi/en) |
