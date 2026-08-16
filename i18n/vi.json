@@ -91,7 +91,7 @@
   "onboarding_step8_title": "Tùy chỉnh cài đặt ⚙️",
   "onboarding_step8_desc": "Nhấn nút ⚙️ Cài đặt để:\n• Đổi tên các nhãn trường tìm kiếm\n• Thêm trường tìm kiếm mới tuỳ ý\n• Chọn kiểu Highlight: tô nền, gạch chân, gạch dưới, in đậm\n• Điều chỉnh độ đậm nhạt của highlight\n• Xem trước kiểu highlight trước khi lưu",
   "onboarding_step9_title": "Phím tắt & Mẹo hay ⌨️",
-  "onboarding_step9_desc": "Các phím tắt giúp bạn thao tác nhanh hơn:\n• Ctrl + Shift + F — Mở extension\n• Ctrl + Shift + S — Quét tất cả\n• Ctrl + Shift + A — Thêm môn mới\n• Ctrl + ↑↓ — Nhảy giữa kết quả (trên trang web)\n• Enter — Tìm kiếm nhanh trong ô đang chọn\n• ESC — Đóng modal / cài đặt",
+  "onboarding_step9_desc": "Các phím tắt giúp bạn thao tác nhanh hơn. Ctrl + Shift + S và Ctrl + Shift + A chỉ hoạt động khi popup/cửa sổ nổi đang focus:\n• Ctrl + Shift + F — Mở extension\n• Ctrl + Shift + S — Quét tất cả\n• Ctrl + Shift + A — Thêm môn mới\n• Ctrl + ↑↓ — Nhảy giữa kết quả (trên trang web)\n• Enter — Tìm kiếm nhanh trong ô đang chọn\n• ESC — Đóng modal / cài đặt",
   "onboarding_step11_title": "Tiện ích & Giải trí 🎁",
   "onboarding_step11_desc": "Các tính năng bổ sung giúp bạn sử dụng hiệu quả hơn:\n• Nút 🔔 Thông báo: Xem lịch sử và trạng thái quét\n• Nút 🌐 Ngôn ngữ: Chuyển đổi linh hoạt Tiếng Việt / English\n• 🔥 Chuỗi ngày (Streak): Đếm số ngày liên tiếp sử dụng công cụ\n• Nút 🐱 Meme: Chế độ giải trí xả stress mùa ĐKMH",
   "onboarding_step10_title": "Sẵn sàng! 🚀",

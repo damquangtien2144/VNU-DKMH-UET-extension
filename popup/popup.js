@@ -54,6 +54,10 @@ const btnScanAll = document.getElementById('btnScanAll');
 // Khởi tạo
 document.addEventListener('DOMContentLoaded', async () => {
     await loadData();
+    if (isIframeMode) {
+        updatePinButton();
+        window.parent.postMessage({ action: 'PIN_STATE', isPinned }, '*');
+    }
     await loadTranslations();
     updateStreak();
     renderLabels();
@@ -115,6 +119,50 @@ async function loadData() {
 // Lưu dữ liệu vào storage
 function saveData() {
     chrome.storage.local.set({ subjects, labels, highlightSettings, lang: currentLang, currentStreak, lastActiveDate });
+}
+
+function getTabAccessError(tab) {
+    if (!tab || typeof tab.id !== 'number') {
+        return 'Không tìm thấy tab đang hoạt động.';
+    }
+
+    try {
+        const protocol = new URL(tab.url || '').protocol;
+        if (!['http:', 'https:', 'file:'].includes(protocol)) {
+            return 'Chrome không cho phép extension truy cập trang hệ thống này. Hãy mở một trang web http/https rồi thử lại.';
+        }
+    } catch (error) {
+        return 'Không xác định được trang đang mở.';
+    }
+
+    return null;
+}
+
+function isMissingContentScriptError(error) {
+    return /Receiving end does not exist|Could not establish connection/i.test(error?.message || '');
+}
+
+async function sendMessageToTab(tab, message) {
+    const accessError = getTabAccessError(tab);
+    if (accessError) throw new Error(accessError);
+
+    try {
+        return await chrome.tabs.sendMessage(tab.id, message);
+    } catch (error) {
+        if (!isMissingContentScriptError(error)) throw error;
+
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['scripts/content.js']
+        });
+        return chrome.tabs.sendMessage(tab.id, message);
+    }
+}
+
+function showTabActionError(error) {
+    console.error(error);
+    const message = error?.message || t('scan_error_alert');
+    showDeepSearchToast(message);
 }
 
 // Cập nhật placeholder dựa trên labels
@@ -333,7 +381,7 @@ function renderSubjects() {
             inputsGrid.querySelectorAll('input').forEach(input => input.disabled = true);
         }
 
-        toggleActive.addEventListener('change', (e) => {
+        toggleActive.addEventListener('change', async (e) => {
             subject.isActive = e.target.checked;
             if (subject.isActive) {
                 row.classList.remove('disabled');
@@ -342,18 +390,21 @@ function renderSubjects() {
             } else {
                 row.classList.add('disabled');
                 inputsGrid.querySelectorAll('input').forEach(input => input.disabled = true);
-                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                    if (tabs[0]) {
-                        chrome.tabs.sendMessage(tabs[0].id, {
+                try {
+                    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                    if (tab) {
+                        await sendMessageToTab(tab, {
                             action: subject.scanMode === 'deep' ? "DEEP_SEARCH" : "HIGHLIGHT",
                             subjectId: subject.id,
                             scanMode: subject.scanMode || 'normal',
                             queries: [],
                             color: subject.color,
                             highlightSettings: highlightSettings
-                        }).catch(e => console.error(e));
+                        });
                     }
-                });
+                } catch (err) {
+                    showTabActionError(err);
+                }
                 updateMatchCounter(subject.id, 0, 0);
             }
             saveData();
@@ -395,7 +446,7 @@ function renderSubjects() {
         if (btnDuplicate) {
             btnDuplicate.addEventListener('click', () => {
                 const newSubject = JSON.parse(JSON.stringify(subject));
-                newSubject.id = Date.now();
+                newSubject.id = crypto.randomUUID();
                 subjects.splice(index + 1, 0, newSubject);
                 saveData();
                 renderSubjects();
@@ -421,16 +472,16 @@ function renderSubjects() {
             try {
                 const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tabs[0]) {
-                    chrome.tabs.sendMessage(tabs[0].id, {
+                    await sendMessageToTab(tabs[0], {
                         action: subject.scanMode === 'deep' ? "DEEP_SEARCH" : "HIGHLIGHT",
                         subjectId: subject.id,
                         scanMode: subject.scanMode,
                         queries: [],
                         color: subject.color,
                         highlightSettings: highlightSettings
-                    }).catch(e => console.error(e));
+                    });
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) { showTabActionError(err); }
             
             renderSubjects();
         });
@@ -452,13 +503,13 @@ function renderSubjects() {
                 try {
                     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                     if (tabs[0]) {
-                        chrome.tabs.sendMessage(tabs[0].id, {
+                        await sendMessageToTab(tabs[0], {
                             action: "BLINK_HIGHLIGHT",
                             subjectId: subject.id,
                             isBlinking: subject.isBlinking
-                        }).catch(e => console.error(e));
+                        });
                     }
-                } catch (err) { console.error(err); }
+                } catch (err) { showTabActionError(err); }
             });
         }
 
@@ -493,7 +544,7 @@ const highlightColors = ['#ffff00', '#00ff00', '#00ffff', '#ff00ff', '#ff8800', 
 btnAdd.addEventListener('click', () => {
     const nextColor = highlightColors[subjects.length % highlightColors.length];
     subjects.push({
-        id: Date.now(),
+        id: crypto.randomUUID(),
         fields: {},
         color: nextColor,
         isActive: true
@@ -523,9 +574,9 @@ btnClearAll.addEventListener('click', async () => {
         try {
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, { action: "HIGHLIGHT_ALL", subjects: [], highlightSettings: highlightSettings }).catch(e => console.error(e));
+                await sendMessageToTab(tabs[0], { action: "HIGHLIGHT_ALL", subjects: [], highlightSettings: highlightSettings });
             }
-        } catch(err) { console.error(err); }
+        } catch(err) { showTabActionError(err); }
 
         renderSubjects();
     }
@@ -534,7 +585,7 @@ btnClearAll.addEventListener('click', async () => {
 // Master Toggle All logic
 const toggleAll = document.getElementById('toggleAll');
 if (toggleAll) {
-    toggleAll.addEventListener('change', (e) => {
+    toggleAll.addEventListener('change', async (e) => {
         const isChecked = e.target.checked;
         subjects.forEach(subject => {
             subject.isActive = isChecked;
@@ -546,12 +597,15 @@ if (toggleAll) {
             performScanAll(); // Tự động quét lại
         } else {
             // Xóa tất cả highlight
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs[0]) {
-                    chrome.tabs.sendMessage(tabs[0].id, { action: "HIGHLIGHT_ALL", subjects: [], highlightSettings: highlightSettings }).catch(e => console.error(e));
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab) {
+                    await sendMessageToTab(tab, { action: "HIGHLIGHT_ALL", subjects: [], highlightSettings: highlightSettings });
                 }
-            });
-            Object.keys(matchCounts).forEach(id => updateMatchCounter(parseInt(id), 0, 0));
+            } catch (err) {
+                showTabActionError(err);
+            }
+            Object.keys(matchCounts).forEach(id => updateMatchCounter(id, 0, 0));
         }
     });
 }
@@ -574,7 +628,7 @@ btnSaveSettings.addEventListener('click', () => {
     inputs.forEach((input, idx) => {
         const oldLabel = labels[idx];
         newLabels.push({
-            id: oldLabel ? oldLabel.id : 'custom_' + Date.now() + '_' + idx,
+            id: oldLabel ? oldLabel.id : 'custom_' + crypto.randomUUID(),
             title: input.value.trim() || 'Trường mới'
         });
     });
@@ -627,7 +681,7 @@ if (customLabelsContainer) {
 
 // --- Chức năng CSV ---
 btnDownloadTemplate.addEventListener('click', () => {
-    const headerRow = labels.map(l => `"${l.title}"`).join(',') + ',"Màu Highlight"';
+    const headerRow = labels.map(l => `"${String(l.title).replace(/"/g, '""')}"`).join(',') + ',"Màu Highlight"';
     const sampleRow = labels.map(l => `""`).join(',');
     const csvContent = `${headerRow}\n${sampleRow},"#FFFF00"`;
     
@@ -640,6 +694,7 @@ btnDownloadTemplate.addEventListener('click', () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 btnImportCsv.addEventListener('click', () => {
@@ -659,18 +714,62 @@ csvFileInput.addEventListener('change', (e) => {
     reader.readAsText(file);
 });
 
+function parseCsvRows(text) {
+    const rows = [];
+    let row = [];
+    let value = '';
+    let inQuotes = false;
+    const input = String(text).replace(/^\uFEFF/, '');
+
+    for (let index = 0; index < input.length; index++) {
+        const character = input[index];
+
+        if (character === '"') {
+            if (inQuotes && input[index + 1] === '"') {
+                value += '"';
+                index++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (character === ',' && !inQuotes) {
+            row.push(value);
+            value = '';
+        } else if ((character === '\n' || character === '\r') && !inQuotes) {
+            if (character === '\r' && input[index + 1] === '\n') index++;
+            row.push(value);
+            if (row.some(cell => cell.trim().length > 0)) rows.push(row);
+            row = [];
+            value = '';
+        } else {
+            value += character;
+        }
+    }
+
+    if (inQuotes) return null;
+
+    row.push(value);
+    if (row.some(cell => cell.trim().length > 0)) rows.push(row);
+    return rows;
+}
+
+function normalizeHighlightColor(value) {
+    const color = String(value || '').trim();
+    if (/^#[0-9a-f]{6}$/i.test(color)) return color.toLowerCase();
+    if (/^#[0-9a-f]{3}$/i.test(color)) {
+        return '#' + color.slice(1).split('').map(character => character + character).join('');
+    }
+    return '#ffff00';
+}
+
 function parseCSV(text) {
-    const lines = text.split('\n').filter(line => line.trim().length > 0);
-    if (lines.length <= 1) {
+    const rows = parseCsvRows(text);
+    if (!rows || rows.length <= 1) {
         alert("File CSV không có dữ liệu hợp lệ!");
         return;
     }
 
-    for (let i = 1; i < lines.length; i++) {
-        const matches = lines[i].match(/(\".*?\"|[^\",\s]+)(?=\s*,|\s*$)/g);
-        if (!matches) continue;
-        
-        const row = matches.map(m => m.replace(/^"|"$/g, '').trim());
+    let importedCount = 0;
+    for (const row of rows.slice(1)) {
         const subject = {
             id: crypto.randomUUID(),
             fields: {},
@@ -678,11 +777,17 @@ function parseCSV(text) {
         };
         
         labels.forEach((label, idx) => {
-            subject.fields[label.id] = row[idx] || '';
+            subject.fields[label.id] = (row[idx] || '').trim();
         });
-        subject.color = row[labels.length] || '#ffff00';
+        subject.color = normalizeHighlightColor(row[labels.length]);
         
         subjects.push(subject);
+        importedCount++;
+    }
+
+    if (importedCount === 0) {
+        alert("File CSV không có dữ liệu hợp lệ!");
+        return;
     }
 
     saveData();
@@ -705,8 +810,7 @@ async function performSearch(subject) {
     if (!tab) return;
 
     try {
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['scripts/content.js'] });
-        const response = await chrome.tabs.sendMessage(tab.id, {
+        const response = await sendMessageToTab(tab, {
             action: subject.scanMode === 'deep' ? "DEEP_SEARCH" : "HIGHLIGHT",
             subjectId: subject.id,
             scanMode: subject.scanMode || 'normal',
@@ -723,7 +827,7 @@ async function performSearch(subject) {
             }
         }
     } catch (err) {
-        console.error(err);
+        showTabActionError(err);
     }
 }
 
@@ -890,8 +994,7 @@ async function performNavigation(subjectId, direction) {
     if (!tab) return;
     
     try {
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['scripts/content.js'] });
-        const response = await chrome.tabs.sendMessage(tab.id, {
+        const response = await sendMessageToTab(tab, {
             action: "NAVIGATE",
             subjectId: subjectId,
             direction: direction
@@ -901,7 +1004,7 @@ async function performNavigation(subjectId, direction) {
             updateMatchCounter(subjectId, response.currentIndex || 0, response.totalCount || 0, storedHiddenCount, response.isCurrentHidden ?? null);
         }
     } catch (err) {
-        console.error(err);
+        showTabActionError(err);
     }
 }
 
@@ -937,8 +1040,7 @@ async function performScanAll() {
     if (!tab) return;
 
     try {
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['scripts/content.js'] });
-        const response = await chrome.tabs.sendMessage(tab.id, {
+        const response = await sendMessageToTab(tab, {
             action: "SCAN_ALL",
             subjects: subjectsData,
             highlightSettings: highlightSettings
@@ -965,7 +1067,7 @@ async function performScanAll() {
             }
         }
     } catch (err) {
-        console.error(err);
+        showTabActionError(err);
     }
 }
 
@@ -1004,7 +1106,7 @@ if (isIframeMode) {
     });
 
     window.addEventListener('message', (event) => {
-        if (event.data && event.data.action === 'DRAG_END') {
+        if (event.source === window.parent && event.data && event.data.action === 'DRAG_END') {
             document.body.classList.remove('is-dragging');
         }
     });
@@ -1012,24 +1114,28 @@ if (isIframeMode) {
 } else {
     // Nếu là popup gốc
     btnTogglePin.addEventListener('click', async () => {
+        const fallbackToWindow = () => {
+            chrome.windows.create({
+                url: chrome.runtime.getURL("popup/popup.html"),
+                type: "popup",
+                width: 820,
+                height: 600
+            });
+            window.close();
+        };
+
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab) return;
+        if (!tab) {
+            fallbackToWindow();
+            return;
+        }
 
         try {
-            await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['scripts/content.js'] });
-            await chrome.tabs.sendMessage(tab.id, { action: "INJECT_PANEL" });
+            await sendMessageToTab(tab, { action: 'INJECT_PANEL' });
             window.close(); // Đóng popup gốc
         } catch (err) {
-            console.error(err);
-            // Hiển thị lỗi ngay trên popup thay vì dùng alert (alert làm popup bị tắt luôn)
-            const btn = document.getElementById('btnTogglePin');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '❌ Lỗi: Không thể nổi ở trang này';
-            btn.style.color = 'red';
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.style.color = '';
-            }, 3000);
+            console.warn("Không thể ghim vào trang hiện tại, chuyển sang chế độ cửa sổ mới.", err);
+            fallbackToWindow();
         }
     });
 }
@@ -1094,7 +1200,7 @@ window.addEventListener('click', (e) => {
     }
 });
 
-// ======= Feature #7: Phím tắt toàn cục =======
+// ======= Feature #7: Phím tắt khi popup/cửa sổ nổi đang được focus =======
 document.addEventListener('keydown', (e) => {
     // Onboarding keyboard navigation
     const onboardingOverlay = document.getElementById('onboardingOverlay');
@@ -1530,6 +1636,49 @@ function initExtraFeatures() {
     const btnImportQr = document.getElementById('btnImportQr');
     let qrCodeInstance = null;
 
+    function createQrShareCode() {
+        const payload = {
+            version: 2,
+            subjects: subjects.map(subject => ({
+                values: labels.map(label => subject.fields[label.id] || ''),
+                color: normalizeHighlightColor(subject.color),
+                isActive: subject.isActive !== false,
+                isBlinking: Boolean(subject.isBlinking),
+                tag: subject.tag || '',
+                scanMode: subject.scanMode || 'normal'
+            }))
+        };
+        return btoa(encodeURIComponent(JSON.stringify(payload)));
+    }
+
+    function decodeQrShareCode(code) {
+        const decoded = decodeURIComponent(atob(code));
+        let payload;
+
+        try {
+            payload = JSON.parse(decoded);
+        } catch (parseError) {
+            // Giữ khả năng nhập các mã QR phiên bản cũ dùng dấu | và ||.
+            if (decoded.trim().startsWith('{') || decoded.trim().startsWith('[')) throw parseError;
+            return decoded.split('||').filter(Boolean).map(value => ({
+                values: value.split('|'),
+                color: '#ffff00',
+                isActive: true,
+                isBlinking: false,
+                tag: '',
+                scanMode: 'normal'
+            }));
+        }
+
+        if (payload?.version !== 2 || !Array.isArray(payload.subjects) || payload.subjects.length === 0) {
+            throw new Error('Unsupported QR payload');
+        }
+        return payload.subjects.map(entry => {
+            if (!Array.isArray(entry.values)) throw new Error('Invalid QR subject');
+            return entry;
+        });
+    }
+
     if (btnShareQR) {
         btnShareQR.addEventListener('click', () => {
             if (subjects.length === 0) {
@@ -1537,13 +1686,7 @@ function initExtraFeatures() {
                 return;
             }
 
-            const dataToShare = subjects.map(s => {
-                const values = labels.map(l => s.fields[l.id] || '');
-                return values.join('|');
-            }).join('||');
-
-            // Nén dữ liệu cơ bản
-            const encoded = btoa(encodeURIComponent(dataToShare));
+            const encoded = createQrShareCode();
             document.getElementById('qrShareCode').value = encoded;
 
             const qrContainer = document.getElementById('qrcode');
@@ -1592,19 +1735,20 @@ function initExtraFeatures() {
             if (!code) return;
 
             try {
-                const decoded = decodeURIComponent(atob(code));
-                const subjectStrings = decoded.split('||');
+                const importedSubjects = decodeQrShareCode(code);
                 
-                subjectStrings.forEach((sStr, i) => {
-                    const values = sStr.split('|');
+                importedSubjects.forEach(entry => {
                     const subject = {
                         id: crypto.randomUUID(),
                         fields: {},
-                        isActive: true,
-                        color: highlightColors[subjects.length % highlightColors.length]
+                        isActive: entry.isActive !== false,
+                        isBlinking: Boolean(entry.isBlinking),
+                        tag: entry.tag || '',
+                        scanMode: entry.scanMode === 'deep' ? 'deep' : 'normal',
+                        color: normalizeHighlightColor(entry.color)
                     };
                     labels.forEach((label, idx) => {
-                        subject.fields[label.id] = values[idx] || '';
+                        subject.fields[label.id] = entry.values[idx] || '';
                     });
                     subjects.push(subject);
                 });

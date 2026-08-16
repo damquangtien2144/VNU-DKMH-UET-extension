@@ -602,9 +602,11 @@ if (typeof window.vnuExtensionLoaded === 'undefined') {
     let isPanelDragging = false;
     let dragStartX, dragStartY;
     let initialTop, initialLeft;
+    const extensionOrigin = new URL(chrome.runtime.getURL('/')).origin;
 
     window.addEventListener('message', (event) => {
-        if (event.origin !== window.location.origin) return;
+        const iframe = document.getElementById('vnu-extension-iframe');
+        if (!iframe || event.source !== iframe.contentWindow || event.origin !== extensionOrigin) return;
         if (event.data && typeof event.data === 'object') {
             const { action, iframeX, iframeY, isPinned } = event.data;
             
@@ -658,7 +660,7 @@ if (typeof window.vnuExtensionLoaded === 'undefined') {
             const iframe = document.getElementById('vnu-extension-iframe');
             if (iframe) {
                 iframe.style.pointerEvents = 'auto';
-                iframe.contentWindow.postMessage({ action: 'DRAG_END' }, '*');
+                iframe.contentWindow.postMessage({ action: 'DRAG_END' }, extensionOrigin);
             }
         }
     });

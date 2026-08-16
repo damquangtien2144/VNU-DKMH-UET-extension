@@ -91,7 +91,7 @@
   "onboarding_step8_title": "Customize Settings ⚙️",
   "onboarding_step8_desc": "Click the ⚙️ Settings button to:\n• Rename search field labels\n• Add custom search fields\n• Choose highlight style: background, wavy underline, solid, bold\n• Adjust highlight opacity\n• Preview highlight style before saving",
   "onboarding_step9_title": "Shortcuts & Tips ⌨️",
-  "onboarding_step9_desc": "Keyboard shortcuts for faster workflow:\n• Ctrl + Shift + F — Open extension\n• Ctrl + Shift + S — Scan all\n• Ctrl + Shift + A — Add new course\n• Ctrl + ↑↓ — Jump between results (on web page)\n• Enter — Quick search from active field\n• ESC — Close modal / settings",
+  "onboarding_step9_desc": "Keyboard shortcuts for faster workflow. Ctrl + Shift + S and Ctrl + Shift + A work only while the popup/floating window has focus:\n• Ctrl + Shift + F — Open extension\n• Ctrl + Shift + S — Scan all\n• Ctrl + Shift + A — Add new course\n• Ctrl + ↑↓ — Jump between results (on web page)\n• Enter — Quick search from active field\n• ESC — Close modal / settings",
   "onboarding_step11_title": "Utilities & Fun 🎁",
   "onboarding_step11_desc": "Additional features to enhance your experience:\n• 🔔 Notifications: View scan history and statuses\n• 🌐 Language: Easily switch between English and Vietnamese\n• 🔥 Streak: Track your consecutive days of using the tool\n• 🐱 Meme Mode: Fun easter eggs to relieve registration stress",
   "onboarding_step10_title": "You're Ready! 🚀",

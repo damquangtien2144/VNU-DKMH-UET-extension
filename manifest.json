@@ -42,7 +42,9 @@
       "resources": [
         "assets/qr/*",
         "assets/gif/*",
-        "logo/*"
+        "logo/*",
+        "popup/*",
+        "i18n/*"
       ],
       "matches": ["<all_urls>"]
     }
